@@ -1,5 +1,5 @@
 # matplotlib inline
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
 from sklearn.metrics import confusion_matrix
@@ -255,6 +255,7 @@ def optimize(num_iterations):
 # Split the test-set into smaller batches of this size.
 test_batch_size = 256
 
+'''
 def plot_images(images, cls_true, cls_pred=None):
     assert len(images) == len(cls_true) == 9
     
@@ -283,6 +284,7 @@ def plot_images(images, cls_true, cls_pred=None):
     # in a single Notebook cell.
     plt.show()
 
+
 def plot_example_errors(cls_pred, correct):
     # This function is called from print_test_accuracy() below.
 
@@ -305,10 +307,13 @@ def plot_example_errors(cls_pred, correct):
     # Get the true classes for those images.
     cls_true = data.test.cls[incorrect]
     
+    
     # Plot the first 9 images.
     plot_images(images=images[0:9],
                 cls_true=cls_true[0:9],
                 cls_pred=cls_pred[0:9])
+
+    
     
 def plot_confusion_matrix(cls_pred):
     # This is called from print_test_accuracy() below.
@@ -324,11 +329,14 @@ def plot_confusion_matrix(cls_pred):
                           y_pred=cls_pred)
 
     # Print the confusion matrix as text.
+    print("confusion matrix")
     print(cm)
+
+    
 
     # Plot the confusion matrix as an image.
     plt.matshow(cm)
-
+    #############################################################
     # Make various adjustments to the plot.
     plt.colorbar()
     tick_marks = np.arange(num_classes)
@@ -340,6 +348,7 @@ def plot_confusion_matrix(cls_pred):
     # Ensure the plot is shown correctly with multiple plots
     # in a single Notebook cell.
     plt.show()
+    '''
 
 def print_test_accuracy(show_example_errors=False,
                         show_confusion_matrix=False):

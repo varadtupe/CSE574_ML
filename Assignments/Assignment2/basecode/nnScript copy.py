@@ -2,9 +2,6 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.io import loadmat
 from math import sqrt
-import pandas as pd
-import time
-import pickle
 
 
 def initializeWeights(n_in, n_out):
@@ -76,7 +73,6 @@ def preprocess():
         # -----------when the set is training set--------------------#
         if "train" in key:
             label = key[-1]  # record the corresponding label
-            print("lablelShape",label)
             tup = mat.get(key)
             sap = range(tup.shape[0])
             tup_perm = np.random.permutation(sap)
@@ -138,13 +134,11 @@ def preprocess():
     train_data = np.delete(train_data, indxDel, axis=1)
     validation_data = np.delete(validation_data, indxDel, axis=1)
     test_data = np.delete(test_data, indxDel, axis=1)
-
-    features = list(*np.where(varCol != 0))
     
 
     print('preprocess done')
 
-    return train_data, train_label, validation_data, validation_label, test_data, test_label, features
+    return train_data, train_label, validation_data, validation_label, test_data, test_label
 
 def nnObjFunction(params, *args):
     """% nnObjFunction computes the value of objective function (negative log 
@@ -193,56 +187,116 @@ def nnObjFunction(params, *args):
     #print(w1.shape,w2.shape)
 
     # Your code here
+    #
+    #
+    #
+    #
+    #
+    dataLen = training_data.shape[0] # 50000
+    
+    # Forward propogation
+    
     # Introducing bias
-    inpB = np.c_[np.ones(len(train_data)),train_data]
-
-    # hidden layer output 1
-    hOp1=np.dot(inpB,np.transpose(w1)) 
-
-    # Activation fucntion for hidden layer 1
-    op1 = sigmoid(hOp1)
-
-    # introducing bias for hidden layer 1 output
-    op1 = np.c_[np.ones(len(op1)),op1]
-
-    # output layer 
-    hop2 = np.dot(op1,np.transpose(w2)) 
-
-    # output layer activation function
-    op = sigmoid(hop2)
-
-    # data length
-    n =len(inpB)
-
-    # coverting label into binay incident matrix 
-    lbl = train_label.astype(int) 
-    lbl=np.eye(len(op[0]))[lbl]
-
-    # Equation 5, 6 ,7
-    nll = -np.sum(np.sum(lbl*np.log(op)+(1-lbl)*np.log(1-op),1))/n
+    inpDataB = np.c_[np.ones(len(training_data)),training_data]  #50000 x col+1
     
+    # Equation 1: forward to hidden layer 1
+    ly1Op=np.dot(inpDataB,np.transpose(w1)) #50000 x col+1 * col+1 x 50   = 50000 x 50
     
-    # Equation 8 & 9
-    delta= op-lbl
-    w2err = np.dot(np.transpose(delta),op1)
+    # Equation 2: Activation function for hidden layer 1
+    l1Act = sigmoid(ly1Op) # 50000 x 50
+    
+    # Introducing bias for hidden layer
+    l1Bias = np.c_[np.ones(len(l1Act)),l1Act] # 50000 x 51
+    
+    # Equation 3: Propogate to output layer
+    opLy = np.dot(l1Bias,np.transpose(w2)) # 50000 x 51 * 51 x 10 = 50000 x 10
 
-    # Equatoin 10 , 11 ,12 
+    # Equation 4: Activation function for output layer
+    op = sigmoid(opLy) # 50000 x 10
+    
+    # Label transpose
+    #lbl = training_label.transpose().reshape(1,dataLen)
 
-    w1err = np.dot(np.transpose(np.dot(delta,w2)*(op1*(1.0- op1))),inpB)
+    valLbl = training_label.transpose().reshape(dataLen,1)
+    #print("valLbl",valLbl.shape) # 50000 x 1
+
+    lbl = np.zeros((dataLen,n_class))
+
+    for i in range(dataLen):
+        index = int(training_label[i])
+        lbl[i][index] = 1
+
+
+    lblT = lbl.transpose() # 50000 x 10
+
+    #print("lbl",lblT.shape)
+    #print("op",op.shape) # 50000 x 10
+    # print("mul", np.dot(lbl,np.log(op)))
     
-    # Equation 15
-    obj_val = nll + lambdaval/2/n*(np.sum(w1**2)+np.sum(w2**2))
+    # Equation 5: Negative log likelyhood error ## Eq 6 & 7 combine
+
+    nllPre = np.dot(lblT , np.log(op)) + np.dot((1-lblT) , np.log(1-op))
+    nll = (-1/dataLen)*(np.sum(nllPre))
+    #print("nnl ",nll)
+    #print("nnl ",nll.shape)
+    #nll = nll.reshape(1,n_class)
+    #print("nnl reshape",nll.shape)
+    # Equation 8 & 9: Error delta & w2 Error
+    delta = op - lbl
     
-    # Equation 16 ,17 removing bias
-    w1reg = (w1err[1:,:]+lambdaval*w1)/n
-    w2reg = (w2err+lambdaval*w2)/n
-     
+    w2Err = np.dot(delta.transpose(),l1Bias)
     
+    # Equation 10, 11, 12: w1 Error
+    #print("w2Err",w2Err.shape)
+
+    #print("l1Act",l1Act.shape)
+    #print("np.dot(delta,w2)", np.dot(delta,w2).shape)
+    #print("trin", training_data.shape)
+    # print("temp",(1- l1Act.transpose())* l1Act.transpose())
+    #print("temp1",(l1Act*(1.0- l1Act)).shape)
+    #print("w2.shape",w2.shape)
+    #print("delta",delta.shape)
+    
+    #w1Err = np.dot(np.dot(((1- l1Act.transpose())* l1Act.transpose()), np.dot(delta,w2)),training_data.transpose())
+    #w1Err = np.dot(np.transpose(np.dot(np.dot(delta,w2).transpose(),(l1Act*(1.0- l1Act)))),training_data)
+
+    s1 = (1 - l1Bias) * l1Bias 
+    #print("s1",s1.shape)
+    s2 = np.dot(delta,w2)
+    #print("s2",s2.shape)
+    s3 = s2 * s1
+    #print("s3",s3.shape)
+    w1Err = np.dot(s3.transpose(),inpDataB)
+    #print("w1Err.shape",w1Err.shape)
+
+    w1Err = w1Err[:-1,:]
+
+    # Regularization
+    
+    # Equation 15: Regularization term 
+ 
+    obj_val = nll + ((np.sum(w1**2) + np.sum(w2**2))/(2*dataLen))*lambdaval
+    #print("w1",w1.shape)
+    # Equation 16 & 17: Gradient
+    #print("lamb",(lambdaval*w1).shape)
+    
+    w1Grad = (w1Err + lambdaval*w1)/dataLen
+    w2Grad = (w2Err + lambdaval*w2)/dataLen
+
+    #print("gradshape",w1Grad.shape,w2Grad.shape)
+
+    
+
+
     # Make sure you reshape the gradient matrices to a 1D array. for instance if your gradient matrices are grad_w1 and grad_w2
     # you would use code similar to the one below to create a flat array
     # obj_grad = np.concatenate((grad_w1.flatten(), grad_w2.flatten()),0)
-    obj_grad = np.concatenate((w1reg.flatten(), w2reg.flatten()),0)
-    #print(obj_val)
+    
+    obj_grad = np.array([])
+    obj_grad = np.concatenate((w1Grad.flatten(),w2Grad.flatten())) 
+
+    #print("grad", obj_grad)
+
     return (obj_val, obj_grad)
 
 def nnPredict(w1, w2, data):
@@ -281,8 +335,8 @@ def nnPredict(w1, w2, data):
     labels = np.array([])
 
     labels = np.argmax(op,axis=1)
-    #print(labels.shape)
-    #labels = labels.reshape(len(labels),1)
+    print(labels.shape)
+    labels = labels.reshape(len(labels),1)
     # Your code here
 
     return labels
@@ -290,123 +344,70 @@ def nnPredict(w1, w2, data):
 
 """**************Neural Network Script Starts here********************************"""
 
-train_data, train_label, validation_data, validation_label, test_data, test_label, features = preprocess()
-neuronsList = [4,8,12,16,20]
-lambdaList = [0,10,20,30,40,50,60]
+train_data, train_label, validation_data, validation_label, test_data, test_label = preprocess()
 
-#neuronsList = [20]
-#lambdaList = [0]
+#  Train Neural Network
 
-#  Train Neural Networks
+# set the number of nodes in input unit (not including bias unit)
+n_input = train_data.shape[1]
 
-# Place holder
-accDF = pd.DataFrame(columns = ['Neurons','Lambda','TrainAcc','ValidAcc','TestAcc','ExeTime'])
+# set the number of nodes in hidden unit (not including bias unit)
+n_hidden = 20
 
-weightDict = {}
+# set the number of nodes in output unit
+n_class = 10
 
-for nuerons in neuronsList:
-    for lambdaVals in lambdaList:
+# initialize the weights into some random matrices
+initial_w1 = initializeWeights(n_input, n_hidden)
+initial_w2 = initializeWeights(n_hidden, n_class)
 
+# unroll 2 weight matrices into single column vector
+initialWeights = np.concatenate((initial_w1.flatten(), initial_w2.flatten()), 0)
 
-        # set the number of nodes in input unit (not including bias unit)
-        n_input = train_data.shape[1]
+# set the regularization hyper-parameter
+lambdaval = 10
 
-        # set the number of nodes in hidden unit (not including bias unit)
-        n_hidden = nuerons
+args = (n_input, n_hidden, n_class, train_data, train_label, lambdaval)
 
-        # set the number of nodes in output unit
-        n_class = 10
+# Train Neural Network using fmin_cg or minimize from scipy,optimize module. Check documentation for a working example
 
-        # initialize the weights into some random matrices
-        initial_w1 = initializeWeights(n_input, n_hidden)
-        initial_w2 = initializeWeights(n_hidden, n_class)
+opts = {'maxiter': 50}  # Preferred value.
 
-        # unroll 2 weight matrices into single column vector
-        initialWeights = np.concatenate((initial_w1.flatten(), initial_w2.flatten()), 0)
+nn_params = minimize(nnObjFunction, initialWeights, jac=True, args=args, method='CG', options=opts)
 
-        # set the regularization hyper-parameter
-        lambdaval = lambdaVals
-
-        print("Number of Neurons",nuerons)
-        print("Lambda",lambdaVals)
-
-        args = (n_input, n_hidden, n_class, train_data, train_label, lambdaval)
-
-        # Train Neural Network using fmin_cg or minimize from scipy,optimize module. Check documentation for a working example
-
-        opts = {'maxiter': 50}  # Preferred value.
-
-        startTime = time.time()
-        nn_params = minimize(nnObjFunction, initialWeights, jac=True, args=args, method='CG', options=opts)
-        endTime = time.time()
-
-        exeTime = (endTime-startTime)
-
-        print("Training Time : ",exeTime)
-
-        # In Case you want to use fmin_cg, you may have to split the nnObjectFunction to two functions nnObjFunctionVal
-        # and nnObjGradient. Check documentation for this function before you proceed.
-        # nn_params, cost = fmin_cg(nnObjFunctionVal, initialWeights, nnObjGradient,args = args, maxiter = 50)
+# In Case you want to use fmin_cg, you may have to split the nnObjectFunction to two functions nnObjFunctionVal
+# and nnObjGradient. Check documentation for this function before you proceed.
+# nn_params, cost = fmin_cg(nnObjFunctionVal, initialWeights, nnObjGradient,args = args, maxiter = 50)
 
 
-        # Reshape nnParams from 1D vector into w1 and w2 matrices
-        w1 = nn_params.x[0:n_hidden * (n_input + 1)].reshape((n_hidden, (n_input + 1)))
-        w2 = nn_params.x[(n_hidden * (n_input + 1)):].reshape((n_class, (n_hidden + 1)))
+# Reshape nnParams from 1D vector into w1 and w2 matrices
+w1 = nn_params.x[0:n_hidden * (n_input + 1)].reshape((n_hidden, (n_input + 1)))
+w2 = nn_params.x[(n_hidden * (n_input + 1)):].reshape((n_class, (n_hidden + 1)))
+
+# Test the computed parameters
+
+predicted_label = nnPredict(w1, w2, train_data)
 
 
-        # Test the computed parameters
 
-        predicted_label = nnPredict(w1, w2, train_data)
+# Test the computed parameters
 
-        # find the accuracy on Training Dataset
-        print("Shape check",predicted_label.shape,train_label.shape)
-        #trainAcc = 100 * np.mean((predicted_label == train_label.reshape(train_label.shape[0],1)))
-        trainAcc = 100 * np.mean((predicted_label == train_label))
-        print('\n Training set Accuracy:' + str(trainAcc) + '%')
+predicted_label = nnPredict(w1, w2, train_data)
 
-        predicted_label = nnPredict(w1, w2, validation_data)
+# find the accuracy on Training Dataset
+print("shape",predicted_label.shape,train_label.shape)
 
-        # find the accuracy on Validation Dataset
-        #validationAcc = 100 * np.mean((predicted_label == validation_label.reshape(validation_label.shape[0],1)))
-        validationAcc = 100 * np.mean((predicted_label == validation_label))
+print('\n Training set Accuracy:' + str(100 * np.mean((predicted_label == train_label.reshape(train_label.shape[0],1)))) + '%')
 
-        print('\n Validation set Accuracy:' + str(validationAcc) + '%')
+predicted_label = nnPredict(w1, w2, validation_data)
+
+# find the accuracy on Validation Dataset
+
+print('\n Validation set Accuracy:' + str(100 * np.mean((predicted_label == validation_label.reshape(validation_label.shape[0],1)))) + '%')
 
 
-        predicted_label = nnPredict(w1, w2, test_data)
+predicted_label = nnPredict(w1, w2, test_data)
 
-        # find the accuracy on Validation Dataset
-        #testAcc = 100 * np.mean((predicted_label == test_label.reshape(test_label.shape[0],1)))
-        testAcc = 100 * np.mean((predicted_label == test_label))
+# find the accuracy on Validation Dataset
 
-        print('\n Test set Accuracy:' + str(testAcc) + '%')
-
-        #caputuring data
-        exeDF = pd.DataFrame([[nuerons,lambdaVals,trainAcc,validationAcc,testAcc,exeTime]],columns = ['Neurons','Lambda','TrainAcc','ValidAcc','TestAcc','ExeTime'])
-
-        accDF = accDF.append(exeDF)
-
-        #weightStore
-        weightLocal = {"w1":w1,"w2":w2}
-        weightKey = str(nuerons)+str(lambdaVals)
-        weightDict[weightKey] = weightLocal
-
-
-print("Accuracy stats")
-print(accDF)
-
-maxIdx = accDF['ValidAcc'].argmax()
-opParam = accDF.iloc[maxIdx]
-n_hidden = int(opParam["Neurons"])
-lambdaval = int(opParam["Lambda"])
-
-weightKey = str(n_hidden)+str(lambdaval)
-
-
-w1 = weightDict[weightKey]["w1"]
-w2 = weightDict[weightKey]["w2"]
-
-pickExp = {"selected_features":features,"n_hidden":n_hidden,"w1":w1,"w2":w2,"lambda":lambdaval}
-pickle.dump(pickExp, open('params.pickle', 'wb'))
-pickle.dump(weightDict, open('weight.pickle', 'wb'))
-
+print('\n Test set Accuracy:' + str(100 * np.mean((predicted_label == test_label.reshape(test_label.shape[0],1)))) + '%')

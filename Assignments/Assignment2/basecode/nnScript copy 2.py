@@ -4,7 +4,6 @@ from scipy.io import loadmat
 from math import sqrt
 import pandas as pd
 import time
-import pickle
 
 
 def initializeWeights(n_in, n_out):
@@ -138,13 +137,11 @@ def preprocess():
     train_data = np.delete(train_data, indxDel, axis=1)
     validation_data = np.delete(validation_data, indxDel, axis=1)
     test_data = np.delete(test_data, indxDel, axis=1)
-
-    features = list(*np.where(varCol != 0))
     
 
     print('preprocess done')
 
-    return train_data, train_label, validation_data, validation_label, test_data, test_label, features
+    return train_data, train_label, validation_data, validation_label, test_data, test_label
 
 def nnObjFunction(params, *args):
     """% nnObjFunction computes the value of objective function (negative log 
@@ -193,56 +190,120 @@ def nnObjFunction(params, *args):
     #print(w1.shape,w2.shape)
 
     # Your code here
+    #
+    #
+    #
+    #
+    #
+    dataLen = training_data.shape[0] # 50000
+    
+    # Forward propogation
+    
     # Introducing bias
-    inpB = np.c_[np.ones(len(train_data)),train_data]
-
-    # hidden layer output 1
-    hOp1=np.dot(inpB,np.transpose(w1)) 
-
-    # Activation fucntion for hidden layer 1
-    op1 = sigmoid(hOp1)
-
-    # introducing bias for hidden layer 1 output
-    op1 = np.c_[np.ones(len(op1)),op1]
-
-    # output layer 
-    hop2 = np.dot(op1,np.transpose(w2)) 
-
-    # output layer activation function
-    op = sigmoid(hop2)
-
-    # data length
-    n =len(inpB)
-
-    # coverting label into binay incident matrix 
-    lbl = train_label.astype(int) 
-    lbl=np.eye(len(op[0]))[lbl]
-
-    # Equation 5, 6 ,7
-    nll = -np.sum(np.sum(lbl*np.log(op)+(1-lbl)*np.log(1-op),1))/n
+    inpDataB = np.c_[np.ones(len(training_data)),training_data]  #50000 x col+1
     
+    # Equation 1: forward to hidden layer 1
+    ly1Op=np.dot(inpDataB,np.transpose(w1)) #50000 x col+1 * col+1 x 50   = 50000 x 50
     
-    # Equation 8 & 9
-    delta= op-lbl
-    w2err = np.dot(np.transpose(delta),op1)
+    # Equation 2: Activation function for hidden layer 1
+    l1Act = sigmoid(ly1Op) # 50000 x 50
+    
+    # Introducing bias for hidden layer
+    l1Bias = np.c_[np.ones(len(l1Act)),l1Act] # 50000 x 51
+    
+    # Equation 3: Propogate to output layer
+    opLy = np.dot(l1Bias,np.transpose(w2)) # 50000 x 51 * 51 x 10 = 50000 x 10
 
-    # Equatoin 10 , 11 ,12 
+    # Equation 4: Activation function for output layer
+    op = sigmoid(opLy) # 50000 x 10
+    
+    # Label transpose
+    #lbl = training_label.transpose().reshape(1,dataLen)
+    lbl = training_label.astype(int)
 
-    w1err = np.dot(np.transpose(np.dot(delta,w2)*(op1*(1.0- op1))),inpB)
+    valLbl = lbl.transpose().reshape(dataLen,1)
+    #print("valLbl",valLbl.shape) # 50000 x 1
+
+    lbl = np.zeros((dataLen,n_class))
+
+    for i in range(dataLen):
+        index = int(training_label[i])
+        lbl[i][index] = 1
+
+
+    lblT = lbl.transpose() # 50000 x 10
+
+    #print("lbl",lblT.shape)
+    #print("op",op.shape) # 50000 x 10
+    # print("mul", np.dot(lbl,np.log(op)))
     
-    # Equation 15
-    obj_val = nll + lambdaval/2/n*(np.sum(w1**2)+np.sum(w2**2))
+    # Equation 5: Negative log likelyhood error ## Eq 6 & 7 combine
+
+    #nllPre = np.dot(lblT , np.log(op)) + np.dot((1.0-lblT) , np.log(1.0-op))
+    #nll = (-1/dataLen)*(np.sum(nllPre))
+
+    nll = -np.sum(np.sum(np.matmul(lblT,np.log(op))+np.matmul((1.0-lblT),np.log(1.0-op)),1))/dataLen
+
+    #print("nnl ",nll)
+    #print("nnl ",nll.shape)
+    #nll = nll.reshape(1,n_class)
+    #print("nnl reshape",nll.shape)
+    # Equation 8 & 9: Error delta & w2 Error
+    delta = op - lbl
     
-    # Equation 16 ,17 removing bias
-    w1reg = (w1err[1:,:]+lambdaval*w1)/n
-    w2reg = (w2err+lambdaval*w2)/n
-     
+    w2Err = np.dot(np.transpose(delta),l1Bias)
     
+    # Equation 10, 11, 12: w1 Error
+    #print("w2Err",w2Err.shape)
+
+    #print("l1Act",l1Act.shape)
+    #print("np.dot(delta,w2)", np.dot(delta,w2).shape)
+    #print("trin", training_data.shape)
+    # print("temp",(1- l1Act.transpose())* l1Act.transpose())
+    #print("temp1",(l1Act*(1.0- l1Act)).shape)
+    #print("w2.shape",w2.shape)
+    #print("delta",delta.shape)
+    
+    #w1Err = np.dot(np.dot(((1- l1Act.transpose())* l1Act.transpose()), np.dot(delta,w2)),training_data.transpose())
+    #w1Err = np.dot(np.transpose(np.dot(np.dot(delta,w2).transpose(),(l1Act*(1.0- l1Act)))),training_data)
+
+    s1 = np.multiply(l1Bias,(1.0 - l1Bias))
+    #print("s1",s1.shape)
+    s2 = np.dot(delta,w2)
+    #print("s2",s2.shape)
+    s3 = np.multiply(s2,s1)
+    #print("s3",s3.shape)
+    w1Err = np.dot(np.transpose(s3),inpDataB)
+    #print("w1Err.shape",w1Err.shape)
+
+    #w1Err = w1Err[1:,:]
+
+    # Regularization
+    
+    # Equation 15: Regularization term 
+ 
+    obj_val = nll + lambdaval * ((np.sum(w1**2) + np.sum(w2**2))/(2*dataLen))
+    #print("w1",w1.shape)
+    # Equation 16 & 17: Gradient
+    #print("lamb",(lambdaval*w1).shape)
+    
+    w1Grad = (w1Err[1:,:] + lambdaval*w1)/dataLen
+    w2Grad = (w2Err + lambdaval*w2)/dataLen
+
+    #print("gradshape",w1Grad.shape,w2Grad.shape)
+
+    
+
+
     # Make sure you reshape the gradient matrices to a 1D array. for instance if your gradient matrices are grad_w1 and grad_w2
     # you would use code similar to the one below to create a flat array
     # obj_grad = np.concatenate((grad_w1.flatten(), grad_w2.flatten()),0)
-    obj_grad = np.concatenate((w1reg.flatten(), w2reg.flatten()),0)
-    #print(obj_val)
+    
+    obj_grad = np.concatenate((w1Grad.flatten(),w2Grad.flatten())) 
+
+    #print("grad", obj_grad)
+    print("obj_val", obj_val)
+
     return (obj_val, obj_grad)
 
 def nnPredict(w1, w2, data):
@@ -290,19 +351,18 @@ def nnPredict(w1, w2, data):
 
 """**************Neural Network Script Starts here********************************"""
 
-train_data, train_label, validation_data, validation_label, test_data, test_label, features = preprocess()
-neuronsList = [4,8,12,16,20]
-lambdaList = [0,10,20,30,40,50,60]
+train_data, train_label, validation_data, validation_label, test_data, test_label = preprocess()
+#neuronsList = [4,8,12,16,20]
+#lambdaList = [0,10,20,30,40,50,60]
 
-#neuronsList = [20]
-#lambdaList = [0]
+neuronsList = [20]
+lambdaList = [0]
 
 #  Train Neural Networks
 
 # Place holder
-accDF = pd.DataFrame(columns = ['Neurons','Lambda','TrainAcc','ValidAcc','TestAcc','ExeTime'])
+accDF = pd.DataFrame(columns = ['Nuerons','Lambda','TrainAcc','ValidAcc','TestAcc','ExeTime'])
 
-weightDict = {}
 
 for nuerons in neuronsList:
     for lambdaVals in lambdaList:
@@ -382,31 +442,9 @@ for nuerons in neuronsList:
         print('\n Test set Accuracy:' + str(testAcc) + '%')
 
         #caputuring data
-        exeDF = pd.DataFrame([[nuerons,lambdaVals,trainAcc,validationAcc,testAcc,exeTime]],columns = ['Neurons','Lambda','TrainAcc','ValidAcc','TestAcc','ExeTime'])
+        exeDF = pd.DataFrame([[nuerons,lambdaVals,trainAcc,validationAcc,testAcc,exeTime]],columns = ['Nuerons','Lambda','TrainAcc','ValidAcc','TestAcc','ExeTime'])
 
         accDF = accDF.append(exeDF)
 
-        #weightStore
-        weightLocal = {"w1":w1,"w2":w2}
-        weightKey = str(nuerons)+str(lambdaVals)
-        weightDict[weightKey] = weightLocal
-
-
 print("Accuracy stats")
 print(accDF)
-
-maxIdx = accDF['ValidAcc'].argmax()
-opParam = accDF.iloc[maxIdx]
-n_hidden = int(opParam["Neurons"])
-lambdaval = int(opParam["Lambda"])
-
-weightKey = str(n_hidden)+str(lambdaval)
-
-
-w1 = weightDict[weightKey]["w1"]
-w2 = weightDict[weightKey]["w2"]
-
-pickExp = {"selected_features":features,"n_hidden":n_hidden,"w1":w1,"w2":w2,"lambda":lambdaval}
-pickle.dump(pickExp, open('params.pickle', 'wb'))
-pickle.dump(weightDict, open('weight.pickle', 'wb'))
-

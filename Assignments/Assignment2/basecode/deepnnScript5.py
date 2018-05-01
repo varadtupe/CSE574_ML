@@ -15,6 +15,8 @@ def create_multilayer_perceptron():
     n_hidden_1 = 256  # 1st layer number of features
     n_hidden_2 = 256  # 2nd layer number of features
     n_hidden_3 = 256  # 2nd layer number of features
+    n_hidden_4 = 256  # 2nd layer number of features
+    n_hidden_5 = 256  # 2nd layer number of features
     n_input = 2376  # data input
     n_classes = 2
 
@@ -23,12 +25,16 @@ def create_multilayer_perceptron():
         'h1': tf.Variable(tf.random_normal([n_input, n_hidden_1])),
         'h2': tf.Variable(tf.random_normal([n_hidden_1, n_hidden_2])),
         'h3': tf.Variable(tf.random_normal([n_hidden_2, n_hidden_3])),
-        'out': tf.Variable(tf.random_normal([n_hidden_3, n_classes]))
+        'h4': tf.Variable(tf.random_normal([n_hidden_3, n_hidden_4])),
+        'h5': tf.Variable(tf.random_normal([n_hidden_4, n_hidden_5])),
+        'out': tf.Variable(tf.random_normal([n_hidden_5, n_classes]))
     }
     biases = {
         'b1': tf.Variable(tf.random_normal([n_hidden_1])),
         'b2': tf.Variable(tf.random_normal([n_hidden_2])),
         'b3': tf.Variable(tf.random_normal([n_hidden_3])),
+        'b4': tf.Variable(tf.random_normal([n_hidden_4])),
+        'b5': tf.Variable(tf.random_normal([n_hidden_5])),
         'out': tf.Variable(tf.random_normal([n_classes]))
     }
     # tf Graph input
@@ -47,8 +53,16 @@ def create_multilayer_perceptron():
     layer_3 = tf.add(tf.matmul(layer_2, weights['h3']), biases['b3'])
     layer_3 = tf.nn.relu(layer_3)
 
+    # Hidden layer with RELU activation
+    layer_4 = tf.add(tf.matmul(layer_3, weights['h4']), biases['b4'])
+    layer_4 = tf.nn.relu(layer_4)
+
+    # Hidden layer with RELU activation
+    layer_5 = tf.add(tf.matmul(layer_4, weights['h5']), biases['b5'])
+    layer_5 = tf.nn.relu(layer_5)
+
     # Output layer with linear activation
-    out_layer = tf.matmul(layer_3, weights['out']) + biases['out']
+    out_layer = tf.matmul(layer_5, weights['out']) + biases['out']
     return out_layer,x,y
 
 # Do not change this
